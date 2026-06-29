@@ -1,0 +1,7 @@
+Make sure you have followed the Add Non Validator steps because 
+
+Adding a validator has a real-world constraint that's easy to miss: the candidate must already be a running, synced node before you vote it in. 
+
+A brand-new node is by definition not yet in the validator set, so it joins as a non-validator first, syncs, and only then gets voted up. 
+
+In other words, you can't actually skip the non-validator step when adding a validator — the new validator is a non-validator right up until the vote passes. add-fullnode.sh plus the auto-discovering besu-net.sh is precisely the tooling for standing up that candidate.
