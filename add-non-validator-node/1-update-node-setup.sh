@@ -1,4 +1,8 @@
-cd ~/besu-qbft-lab && cat > besu-net.sh <<'SCRIPT'
+cd ~/besu-qbft-lab
+
+# besu-net.sh is general-purpose and only needs to be written once.
+if [ ! -f besu-net.sh ]; then
+cat > besu-net.sh <<'SCRIPT'
 #!/usr/bin/env bash
 # Besu QBFT lab network control. Auto-discovers every node-* directory.
 set -uo pipefail
@@ -44,18 +48,25 @@ case "$cmd" in
 esac
 SCRIPT
 chmod +x besu-net.sh
+echo "besu-net.sh installed"
+else
+echo "besu-net.sh already present — skipping (delete ~/besu-qbft-lab/besu-net.sh to force reinstall)"
+fi
 
 cat > add-fullnode.sh <<'SCRIPT'
 #!/usr/bin/env bash
-# Create a NON-VALIDATOR full/RPC node and wire it to the 4 validators.
+# Create a NON-VALIDATOR full/RPC node and wire it to all existing nodes.
 set -euo pipefail
 LAB="$HOME/besu-qbft-lab"; cd "$LAB"
-N="${1:-5}"; P2P=$((30302 + N)); RPC=$((8544 + N)); HOST="127.0.0.1"
+N="${1:?usage: add-fullnode.sh <node-number>}"; P2P=$((30302 + N)); RPC=$((8544 + N)); HOST="127.0.0.1"
 [ -d "node-$N" ] && { echo "node-$N already exists — pick another number" >&2; exit 1; }
 mkdir -p "node-$N/data"
 out="node-$N/data/static-nodes.json"; echo "[" > "$out"; first=1
-for v in 1 2 3 4; do
-  [ -f "node-$v/data/key.pub" ] || { echo "missing node-$v/data/key.pub" >&2; exit 1; }
+for d in node-*/; do
+  [ -d "$d" ] || continue
+  v="${d%/}"; v="${v#node-}"
+  [ "$v" = "$N" ] && continue
+  [ -f "node-$v/data/key.pub" ] || continue
   pub=$(tr -d '[:space:]' < "node-$v/data/key.pub"); pub=${pub#0x}
   vp2p=$((30302 + v))
   [ "$first" -eq 1 ] && first=0 || echo "," >> "$out"
@@ -63,8 +74,8 @@ for v in 1 2 3 4; do
 done
 printf '\n]\n' >> "$out"
 echo "Created node-$N (p2p=$P2P rpc=$RPC) as a NON-VALIDATOR full node."
-echo "It will dial all four validators on first start, sync the chain, and serve"
+echo "It will dial all existing nodes on first start, sync the chain, and serve"
 echo "RPC on port $RPC — but it holds no validator key, so it takes no part in consensus."
 echo "--- node-$N/data/static-nodes.json ---"; cat "$out"
 SCRIPT
-chmod +x add-fullnode.sh && echo "installed"
+chmod +x add-fullnode.sh && echo "add-fullnode.sh installed"
