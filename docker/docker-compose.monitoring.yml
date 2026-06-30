@@ -1,0 +1,51 @@
+name: besu-qbft
+
+# Attach Prometheus + Grafana to the existing besu-net network.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#   or:  make monitoring-start
+
+networks:
+  besu-net:
+    external: true
+    name: besu-qbft_besu-net
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: besu-prometheus
+    restart: unless-stopped
+    networks:
+      - besu-net
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: besu-grafana
+    restart: unless-stopped
+    networks:
+      - besu-net
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/besu-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus

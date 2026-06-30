@@ -1,0 +1,22 @@
+# Generated keys and blockchain data — never commit these
+nodes/*/data/key
+nodes/*/data/key.pub
+nodes/*/data/static-nodes.json
+nodes/*/data/database/
+nodes/*/data/caches/
+
+# Generated genesis
+config/genesis.json
+config/network-files/
+
+# Docker named-volume data (if bind-mounted locally for inspection)
+.data/
+
+# Grafana provisioned data
+monitoring/grafana/data/
+
+# Local overrides
+.env.local
+docker-compose.override.yml
+
+.env

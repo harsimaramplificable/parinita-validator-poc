@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape metrics from all validator nodes.
+  # Container names resolve via Docker DNS on the shared besu-net network.
+  - job_name: besu-validators
+    static_configs:
+      - targets:
+          - besu-validator-1:9545
+          - besu-validator-2:9545
+          - besu-validator-3:9545
+          - besu-validator-4:9545
+        labels:
+          network: qbft
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(besu-validator-\d+):.*'
+        target_label: instance
+        replacement: '$1'
+
+  # Scrape Prometheus itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,119 @@
+name: besu-qbft
+
+# ─── Shared network with fixed subnet ────────────────────────────────────────
+# Besu requires IP addresses (not hostnames) in enode URLs.
+# Fixed IPs are assigned per container so static-nodes.json can use them.
+networks:
+  besu-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.240.0/24
+
+# ─── Named volumes for blockchain data persistence ────────────────────────────
+volumes:
+  validator-1-data:
+  validator-2-data:
+  validator-3-data:
+  validator-4-data:
+
+# ─── Shared service defaults ──────────────────────────────────────────────────
+x-besu-defaults: &besu-defaults
+  image: hyperledger/besu:${BESU_VERSION:-latest}
+  restart: unless-stopped
+  # p2p-host is omitted from config.toml; Besu auto-detects its container IP.
+  # For multi-VM, pass --p2p-host=<external-ip> in single-node-compose.yml.
+  healthcheck:
+    test: ["CMD-SHELL", "curl -sf http://localhost:8545/liveness || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 60s
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+
+# ─── Validator nodes ──────────────────────────────────────────────────────────
+services:
+  validator-1:
+    <<: *besu-defaults
+    container_name: besu-validator-1
+    hostname: besu-validator-1
+    networks:
+      besu-net:
+        ipv4_address: ${VALIDATOR_1_IP:-172.16.240.11}
+    volumes:
+      - validator-1-data:/opt/besu/data
+      - ./nodes/validator-1/data/key:/opt/besu/keys/key:ro
+      - ./nodes/validator-1/data/static-nodes.json:/opt/besu/data/static-nodes.json:ro
+      - ./config/genesis.json:/opt/besu/genesis.json:ro
+      - ./nodes/validator-1/config.toml:/opt/besu/config.toml:ro
+    ports:
+      # host:container — each validator maps to a different host port
+      - "30303:30303/tcp"   # P2P TCP
+      - "30303:30303/udp"   # P2P UDP
+      - "8545:8545"         # JSON-RPC HTTP
+      - "9545:9545"         # Prometheus metrics
+    command: ["--config-file=/opt/besu/config.toml"]
+
+  validator-2:
+    <<: *besu-defaults
+    container_name: besu-validator-2
+    hostname: besu-validator-2
+    networks:
+      besu-net:
+        ipv4_address: ${VALIDATOR_2_IP:-172.16.240.12}
+    volumes:
+      - validator-2-data:/opt/besu/data
+      - ./nodes/validator-2/data/key:/opt/besu/keys/key:ro
+      - ./nodes/validator-2/data/static-nodes.json:/opt/besu/data/static-nodes.json:ro
+      - ./config/genesis.json:/opt/besu/genesis.json:ro
+      - ./nodes/validator-2/config.toml:/opt/besu/config.toml:ro
+    ports:
+      - "30304:30303/tcp"
+      - "30304:30303/udp"
+      - "8546:8545"
+      - "9546:9545"
+    command: ["--config-file=/opt/besu/config.toml"]
+
+  validator-3:
+    <<: *besu-defaults
+    container_name: besu-validator-3
+    hostname: besu-validator-3
+    networks:
+      besu-net:
+        ipv4_address: ${VALIDATOR_3_IP:-172.16.240.13}
+    volumes:
+      - validator-3-data:/opt/besu/data
+      - ./nodes/validator-3/data/key:/opt/besu/keys/key:ro
+      - ./nodes/validator-3/data/static-nodes.json:/opt/besu/data/static-nodes.json:ro
+      - ./config/genesis.json:/opt/besu/genesis.json:ro
+      - ./nodes/validator-3/config.toml:/opt/besu/config.toml:ro
+    ports:
+      - "30305:30303/tcp"
+      - "30305:30303/udp"
+      - "8547:8545"
+      - "9547:9545"
+    command: ["--config-file=/opt/besu/config.toml"]
+
+  validator-4:
+    <<: *besu-defaults
+    container_name: besu-validator-4
+    hostname: besu-validator-4
+    networks:
+      besu-net:
+        ipv4_address: ${VALIDATOR_4_IP:-172.16.240.14}
+    volumes:
+      - validator-4-data:/opt/besu/data
+      - ./nodes/validator-4/data/key:/opt/besu/keys/key:ro
+      - ./nodes/validator-4/data/static-nodes.json:/opt/besu/data/static-nodes.json:ro
+      - ./config/genesis.json:/opt/besu/genesis.json:ro
+      - ./nodes/validator-4/config.toml:/opt/besu/config.toml:ro
+    ports:
+      - "30306:30303/tcp"
+      - "30306:30303/udp"
+      - "8548:8545"
+      - "9548:9545"
+    command: ["--config-file=/opt/besu/config.toml"]
