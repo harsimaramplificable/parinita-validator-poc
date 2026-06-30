@@ -8,9 +8,10 @@ cd ~/besu-qbft-lab && cat > qbftConfigFile.json <<'EOF'
       "chainId": 1337,
       "berlinBlock": 0,
       "qbft": {
-        "blockperiodseconds": 2,
+        "blockperiodseconds": 0,
         "epochlength": 30000,
-        "requesttimeoutseconds": 4
+        "requesttimeoutseconds": 4,
+        "emptyblockperiodseconds": 9999999
       }
     },
     "nonce": "0x0",
@@ -45,4 +46,4 @@ cd ~/besu-qbft-lab && cat > qbftConfigFile.json <<'EOF'
   }
 }
 EOF
-echo "Written. Validating:" && python3 -c "import json; json.load(open('qbftConfigFile.json')); print('qbftConfigFile.json is valid JSON')"</parameter>
+echo "Written. Validating:" && python3 -c "import json; json.load(open('qbftConfigFile.json')); print('qbftConfigFile.json is valid JSON')"
