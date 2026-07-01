@@ -1,0 +1,19 @@
+{
+  "name": "smart-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Chrysalis Ledger on Besu QBFT network",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.js --network besu",
+    "interact": "hardhat run scripts/interact.js --network besu",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  },
+  "dependencies": {
+    "@noble/post-quantum": "^0.4.1",
+    "dotenv": "^16.4.0"
+  }
+}
