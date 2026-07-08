@@ -43,12 +43,14 @@ for d in candidates:
         continue
     extras.append(n)
 
+# NOTE: do NOT redeclare `besu-net` here. This override is auto-merged with the
+# base docker-compose.yml on every `docker compose up`. Marking the network
+# `external` would override the base definition and stop Compose from ever
+# creating it (fails with "network besu-qbft_besu-net ... could not be found"
+# after a `make destroy` removes it). Extra-validator services below simply
+# attach to `besu-net`, which the base file defines and creates.
 lines = [
     "name: besu-qbft",
-    "networks:",
-    "  besu-net:",
-    "    external: true",
-    "    name: besu-qbft_besu-net",
 ]
 
 if extras:

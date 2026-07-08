@@ -1,13 +1,11 @@
 name: besu-qbft
 
-# Attach Prometheus + Grafana to the existing besu-net network.
+# Attach Prometheus + Grafana to the besu-net network.
+# Always run merged with the base file, which defines/creates besu-net:
 # Usage: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 #   or:  make monitoring-start
-
-networks:
-  besu-net:
-    external: true
-    name: besu-qbft_besu-net
+# Do NOT redeclare besu-net as `external` here — that would override the base
+# definition and stop Compose from creating it.
 
 volumes:
   prometheus-data:
