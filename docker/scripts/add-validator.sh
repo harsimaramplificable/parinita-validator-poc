@@ -104,6 +104,18 @@ PY
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# validator_count PORT
+#   Returns the number of validators in the active set, or 0 on failure.
+# ─────────────────────────────────────────────────────────────────────────────
+validator_count() {
+  curl -sf --max-time 5 -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"qbft_getValidatorsByBlockNumber","params":["latest"],"id":1}' \
+    "http://127.0.0.1:$1" \
+    | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('result',[])))" 2>/dev/null \
+    || echo "0"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # wait_for_new_block PORT BASELINE [TIMEOUT_SECS]
 #   Polls until block number > BASELINE.  Returns 0 on success, 1 on timeout.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -348,7 +360,18 @@ PY
 
   # Poll until the new validator appears in the active set, pumping more
   # transactions each round if the chain stalls again.
-  if wait_for_validator_in_set "$NEW_ADDR" "$REF_RPC_PORT" 15; then
+  #
+  # A QBFT vote is only recorded when the voting validator becomes the block
+  # proposer, and validators propose round-robin. Reaching a majority therefore
+  # takes up to one full proposer rotation (≈ current validator count blocks),
+  # so the confirmation window must scale with the validator count rather than
+  # stay fixed — otherwise adds silently fail past ~30 validators.
+  CUR_VALIDATORS=$(validator_count "$REF_RPC_PORT")
+  [ "$CUR_VALIDATORS" -gt 0 ] 2>/dev/null || CUR_VALIDATORS=15
+  MAX_ROUNDS=$((CUR_VALIDATORS + 8))
+  [ "$MAX_ROUNDS" -lt 15 ] && MAX_ROUNDS=15
+  echo "  Current set has $CUR_VALIDATORS validator(s); allowing up to $MAX_ROUNDS confirm rounds."
+  if wait_for_validator_in_set "$NEW_ADDR" "$REF_RPC_PORT" "$MAX_ROUNDS"; then
     echo ""
     echo "  ✔ validator-$N (${NEW_ADDR:0:12}...) is now in the active set."
     last_n=$N
