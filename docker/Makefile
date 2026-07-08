@@ -1,8 +1,10 @@
 .PHONY: help generate-keys setup-nodes start stop restart status logs validators \
-        peers block monitoring-start monitoring-stop clean clean-keys destroy add-validator remove-validator
+        peers block monitoring-start monitoring-stop clean clean-keys destroy add-validator remove-validator \
+        test test-fast test-connectivity test-peers test-consensus test-validators test-tx test-fault
 
 SHELL := /bin/bash
 SCRIPTS := scripts
+TESTS := tests
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -85,6 +87,36 @@ ifndef NODE
 endif
 	@chmod +x $(SCRIPTS)/remove-validator.sh
 	@bash $(SCRIPTS)/remove-validator.sh $(NODE)
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+# All tests auto-discover the current validator set (any count) — no hardcoded
+# "4 nodes". Run the whole suite, or a single test. Requires a running network.
+
+test: ## Run the FULL test suite (auto-scales to current validator count)
+	@chmod +x $(TESTS)/*.sh
+	@bash $(TESTS)/run-all.sh
+
+test-fast: ## Run all tests EXCEPT the slow fault-tolerance test
+	@chmod +x $(TESTS)/*.sh
+	@bash $(TESTS)/run-all.sh --fast
+
+test-connectivity: ## Test: RPC reachable + chain id on every validator
+	@bash $(TESTS)/01-connectivity.sh
+
+test-peers: ## Test: full peer mesh (each node sees N-1 peers)
+	@bash $(TESTS)/02-peers.sh
+
+test-consensus: ## Test: blocks are being produced and all nodes agree
+	@bash $(TESTS)/03-consensus.sh
+
+test-validators: ## Test: on-chain validator set matches nodes + is consistent
+	@bash $(TESTS)/04-validators.sh
+
+test-tx: ## Test: send a value transfer and confirm it is mined
+	@bash $(TESTS)/05-transaction.sh
+
+test-fault: ## Test: BFT 2/3 availability (stops/restarts nodes, self-heals)
+	@bash $(TESTS)/06-fault-tolerance.sh
 
 # ─── Monitoring ───────────────────────────────────────────────────────────────
 
