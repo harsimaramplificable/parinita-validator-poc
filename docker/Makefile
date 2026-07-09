@@ -32,7 +32,11 @@ setup-nodes: ## [2] Distribute keys and create static-nodes.json
 	@chmod +x $(SCRIPTS)/2-setup-nodes.sh
 	@bash $(SCRIPTS)/2-setup-nodes.sh
 
-init: generate-keys setup-nodes ## [1+2] Full initial setup in one step
+init: generate-keys setup-nodes ## [1+2] Full initial setup in one step (4 validators)
+
+init-genesis: ## Init an N-validator chain with ALL validators in genesis (no voting). Usage: make init-genesis COUNT=50
+	@chmod +x $(SCRIPTS)/init-genesis.sh
+	@bash $(SCRIPTS)/init-genesis.sh $(or $(COUNT),50)
 
 # ─── Network operations ───────────────────────────────────────────────────────
 
