@@ -21,6 +21,15 @@ volumes:
 x-besu-defaults: &besu-defaults
   image: hyperledger/besu:${BESU_VERSION:-latest}
   restart: unless-stopped
+  # Cap the JVM heap. Without this each Besu container defaults its max heap to
+  # ~25% of HOST RAM (~15 GB on a 60 GB box); 50 such JVMs overcommit memory,
+  # swap, and the resulting GC pauses block the consensus threads. A small dev
+  # chain runs comfortably in a few hundred MB of heap.
+  environment:
+    BESU_OPTS: "-Xmx640m"
+  # Hard per-node ceiling (heap + off-heap). 50 x 1.5 GB stays within ~60 GB with
+  # room for the OS. Rarely hit in practice; it's a safety net, not a reservation.
+  mem_limit: 1536m
   # p2p-host is omitted from config.toml; Besu auto-detects its container IP.
   # For multi-VM, pass --p2p-host=<external-ip> in single-node-compose.yml.
   healthcheck:

@@ -69,6 +69,11 @@ if extras:
             f"    container_name: besu-validator-{n}",
             f"    hostname: besu-validator-{n}",
             f"    restart: unless-stopped",
+            # Match x-besu-defaults in docker-compose.yml: cap JVM heap so 50
+            # nodes don't each default to ~25% of host RAM, and bound total RSS.
+            f"    environment:",
+            f'      BESU_OPTS: "-Xmx640m"',
+            f"    mem_limit: 1536m",
             f"    networks:",
             f"      besu-net:",
             f"        ipv4_address: {ip}",

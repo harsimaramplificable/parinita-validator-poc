@@ -192,7 +192,10 @@ REF_RPC_PORT=8545
 # Main loop — one validator at a time
 # ─────────────────────────────────────────────────────────────────────────────
 for i in $(seq 1 "$COUNT"); do
-  N=$((last_n + i))
+  # last_n is advanced to N after each successful add (see end of loop), so the
+  # next validator is always last_n + 1. Do NOT add the loop index i here: that
+  # would compound with the last_n bump and skip numbers (6, 8, 11, 15, 20 …).
+  N=$((last_n + 1))
   P2P_HOST_PORT=$((30302 + N))
   RPC_HOST_PORT=$((8544  + N))
   METRICS_HOST_PORT=$((9544 + N))
@@ -215,7 +218,7 @@ for i in $(seq 1 "$COUNT"); do
     "config": {
       "chainId": ${CHAIN_ID:-1337},
       "berlinBlock": 0,
-      "qbft": { "blockperiodseconds": 2, "epochlength": 30000, "requesttimeoutseconds": 4 }
+      "qbft": { "blockperiodseconds": 4, "epochlength": 30000, "requesttimeoutseconds": 16 }
     },
     "nonce": "0x0", "timestamp": "0x0", "gasLimit": "0x1C9C380",
     "difficulty": "0x1",
