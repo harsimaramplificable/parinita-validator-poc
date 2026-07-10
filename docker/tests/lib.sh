@@ -21,6 +21,10 @@ if [[ -f "$DOCKER_DIR/.env" ]]; then
 fi
 EXPECTED_CHAIN_ID="${CHAIN_ID:-1337}"
 BLOCK_PERIOD="${BLOCK_PERIOD_SECONDS:-2}"
+# QBFT round-0 timeout. On a round failure (e.g. the round's proposer is offline)
+# the timeout DOUBLES each round, so waits that must survive an offline proposer
+# have to be sized off this, not just the block period.
+REQUEST_TIMEOUT="${REQUEST_TIMEOUT_SECONDS:-16}"
 
 # Prefunded Besu dev accounts (PUBLICLY KNOWN KEYS — lab use only).
 SENDER_ADDR="0xfe3b557e8fb62b89f4916b721be55ceb828dbd73"
@@ -211,4 +215,31 @@ require_running() {
     exit 2
   fi
   info "Discovered $total validator(s); $up reachable via RPC."
+}
+
+# wait_all_reachable [secs] — give a freshly started network time to bind RPC on
+# EVERY node before asserting. A large validator set (50+) takes far longer for
+# all nodes to finish crypto init and bind their RPC listener than a 15-node set
+# (the compose healthcheck itself allows a 60s start_period), so a single probe
+# right after `make start` races that boot and reports healthy-but-slow nodes as
+# unreachable. Polls until every discovered validator answers, or until <secs>
+# elapses. Returns 0 if all came up, 1 on timeout — the caller still proceeds so
+# a genuinely-dead node surfaces as a per-node failure instead of being hidden.
+# Default budget scales with the node count; override with TEST_STARTUP_WAIT.
+wait_all_reachable() {
+  local n total up i=0 secs
+  total=$(validator_count)
+  secs="${1:-${TEST_STARTUP_WAIT:-$(( 40 + total * 2 ))}}"
+  while (( i < secs )); do
+    up=0
+    while IFS= read -r n; do rpc_reachable "$(rpc_port "$n")" && up=$((up+1)); done < <(discover_validators)
+    if (( up == total )); then
+      (( i > 0 )) && info "all $total validator(s) reachable after ${i}s"
+      return 0
+    fi
+    (( i == 0 )) && info "waiting up to ${secs}s for all $total validator(s) to bind RPC ($up up so far)…"
+    sleep 2; i=$((i+2))
+  done
+  warn "startup grace elapsed (${secs}s): $up/$total reachable — proceeding (stragglers will show as failures)"
+  return 1
 }

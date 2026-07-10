@@ -29,8 +29,13 @@ MAXF=$(qbft_max_faults "$N")
 
 OBS="${VALS[0]}"; OBS_PORT=$(rpc_port "$OBS")
 
-# How long to allow for a poked block to appear once quorum IS met…
-LIVE_WAIT="${FAULT_LIVE_WAIT:-$(( BLOCK_PERIOD * 6 + 6 ))}"
+# How long to allow for a poked block to appear once quorum IS met. This must
+# survive the worst case where the round's proposer is one of the stopped nodes:
+# QBFT then round-changes (round-0 timeout REQUEST_TIMEOUT, DOUBLING each round)
+# until it lands on a live proposer. With floor(N/3) nodes down that can take two
+# round-changes (REQUEST_TIMEOUT + 2*REQUEST_TIMEOUT), so budget for it — a window
+# sized off BLOCK_PERIOD alone gives false "frozen" results (flaky PHASE 1).
+LIVE_WAIT="${FAULT_LIVE_WAIT:-$(( REQUEST_TIMEOUT * 3 + BLOCK_PERIOD * 3 ))}"
 # …grace window for consensus to resume on its own after quorum is restored,
 # before we fall back to the rolling restart that clears the round back-off.
 GRACE="${FAULT_GRACE:-30}"
@@ -101,10 +106,15 @@ docker logs "$(container_name "$OBS")" --tail 200 2>&1 | grep -iE "RoundChange|R
 #   1. Restoring quorum is necessary but, after a freeze, the surviving nodes are
 #      deep in QBFT round-change back-off (round timer doubles each round), so
 #      just re-adding the missing node can take minutes to resume.
-#   2. The operator-grade fix that ALWAYS clears the back-off is a rolling restart
-#      of the validators (fresh boot ⇒ round 0 ⇒ immediate consensus).
+#   2. The operator-grade fix that ALWAYS clears the back-off is a SIMULTANEOUS
+#      restart of all validators (every node down at once, then all back up).
+#      QBFT round state is in-memory only, so taking the whole set down wipes it
+#      globally; everyone reboots at round 0 ⇒ immediate consensus. A *rolling*
+#      restart does NOT work: a freshly booted node rejoins a network still
+#      advertising the high round, receives those round-change messages, and is
+#      dragged straight back up to the elevated round.
 # We first give the graceful path a short grace window, then fall back to the
-# rolling restart so the network is guaranteed healthy at the end.
+# simultaneous restart so the network is guaranteed healthy at the end.
 section "PHASE 3 — restore all validators & recover"
 for n in "${STOPPED[@]}"; do [[ -n "$n" ]] || continue; info "starting validator-$n"; node_start "$n"; done
 for n in "${STOPPED[@]}"; do [[ -n "$n" ]] || continue; wait_rpc "$(rpc_port "$n")" 40 >/dev/null 2>&1 || true; done
@@ -117,15 +127,19 @@ if chain_progresses "$OBS_PORT" "$GRACE"; then
   recovered=1
 else
   warn "still stuck in round-change back-off after restoring quorum — this is expected"
-  warn "clearing it with a rolling restart of all validators (standard QBFT recovery)…"
-  while IFS= read -r n; do docker restart "$(container_name "$n")" >/dev/null 2>&1; done < <(discover_validators)
+  warn "clearing it with a simultaneous restart of all validators (standard QBFT recovery)…"
+  # Stop EVERY validator first (all down at once) so no surviving node keeps
+  # advertising the elevated round, then bring them all back at round 0. A
+  # one-at-a-time restart would let reboots get dragged back up to the high round.
+  while IFS= read -r n; do docker stop "$(container_name "$n")" >/dev/null 2>&1; done < <(discover_validators)
+  while IFS= read -r n; do docker start "$(container_name "$n")" >/dev/null 2>&1; done < <(discover_validators)
   while IFS= read -r n; do wait_rpc "$(rpc_port "$n")" 40 >/dev/null 2>&1 || true; done < <(discover_validators)
   sleep "$SETTLE"
   if chain_progresses "$OBS_PORT" "$LIVE_WAIT"; then
-    pass "chain recovered after a rolling restart cleared the round back-off ($PROG_FROM → $PROG_TO)"
+    pass "chain recovered after a simultaneous restart cleared the round back-off ($PROG_FROM → $PROG_TO)"
     recovered=1
   else
-    fail "chain still not producing after restoring quorum and a rolling restart ($PROG_FROM held)"
+    fail "chain still not producing after restoring quorum and a simultaneous restart ($PROG_FROM held)"
   fi
 fi
 STOPPED=(); trap - EXIT

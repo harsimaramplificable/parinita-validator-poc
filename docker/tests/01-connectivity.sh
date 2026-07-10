@@ -5,6 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 section "TEST 01 — RPC connectivity & chain id"
 require_running
+wait_all_reachable   # let a large set finish booting before probing each node
 info "Expected chain id: $EXPECTED_CHAIN_ID"
 
 while IFS= read -r n; do
